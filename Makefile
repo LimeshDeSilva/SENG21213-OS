@@ -19,8 +19,8 @@ else
     LDFLAGS := -m elf_i386 -nostdlib
 endif
 
-BOOT_SRC       := boot/boot.asm
-BOOT_BIN       := boot/boot.bin
+BOOT_SRC        := boot/boot.asm
+BOOT_BIN        := boot/boot.bin
 
 KERNEL_ASM_SRCS := kernel/kernel_entry.asm boot/switch.asm
 KERNEL_ASM_OBJS := build/kernel_entry.o build/switch.o
@@ -28,7 +28,9 @@ KERNEL_ASM_OBJS := build/kernel_entry.o build/switch.o
 KERNEL_C_SRCS   := kernel/kernel.c \
                    kernel/vga.c    \
                    kernel/keyboard.c \
-                   kernel/process.c
+                   kernel/process.c \
+                   kernel/thread.c \
+                   kernel/mutex.c
 
 KERNEL_C_OBJS   := $(patsubst kernel/%.c, build/%.o, $(KERNEL_C_SRCS))
 KERNEL_ELF      := build/kernel.elf

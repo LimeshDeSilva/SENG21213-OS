@@ -25,6 +25,8 @@
 #include "keyboard.h"
 #include "../include/types.h"
 #include "process.h"
+#include "thread.h"
+#include "mutex.h"
 /* ---------------------------------------------------------------------------
  * Forward declarations of shell commands
  * --------------------------------------------------------------------------*/
@@ -197,6 +199,38 @@ static void cmd_yield(void) {
     process_yield();
 }
 
+static mutex_t test_mutex;
+static int shared_counter = 0;
+
+static void worker_thread(void) {
+    vga_puts("\n  [Thread Worker] Trying to acquire mutex...\n");
+    mutex_lock(&test_mutex);
+    vga_puts("  [Thread Worker] Mutex acquired! Modifying shared resource.\n");
+    shared_counter += 10;
+    mutex_unlock(&test_mutex);
+    vga_puts("  [Thread Worker] Mutex released. Exiting.\n");
+}
+
+static void cmd_threads(void) {
+    vga_puts("\n");
+    thread_list();
+}
+
+static void cmd_mutex_test(void) {
+    vga_puts("\n  [Mutex Test] Initializing mutex and spawning worker thread...\n");
+    mutex_init(&test_mutex);
+    shared_counter = 5;
+    thread_create("m_worker", worker_thread);
+
+    vga_puts("  [Main Context] Yielding to worker thread...\n");
+    thread_yield();
+
+    vga_puts("  [Main Context] Resumed. Shared counter value: ");
+    vga_putchar('0' + (shared_counter / 10));
+    vga_putchar('0' + (shared_counter % 10));
+    vga_puts("\n");
+}
+
 static void shell_run(void) {
     vga_puts_color("\n  Kernel Shell ready. Type 'help' for commands.\n",
                    VGA_LIGHT_GREEN, VGA_BLACK);
@@ -217,6 +251,8 @@ static void shell_run(void) {
 	if (k_strcmp(cmd, "ps")    == 0) { cmd_ps();    continue; }
         if (k_strcmp(cmd, "spawn") == 0) { cmd_spawn(); continue; }
         if (k_strcmp(cmd, "yield") == 0) { cmd_yield(); continue; }
+	if (k_strcmp(cmd, "threads") == 0) { cmd_threads();    continue; }
+        if (k_strcmp(cmd, "mutex")   == 0) { cmd_mutex_test(); continue; }
 
         if (k_strncmp(cmd, "echo ", 5) == 0) {
             cmd_echo(k_ltrim(cmd + 5));
@@ -225,7 +261,6 @@ static void shell_run(void) {
 
         /* Milestone stubs */
         if (k_strcmp(cmd, "kill")    == 0 ||
-            k_strcmp(cmd, "threads") == 0 ||
             k_strcmp(cmd, "free")    == 0 ||
             k_strcmp(cmd, "ls")      == 0 ||
             k_strcmp(cmd, "cat")     == 0) {
@@ -248,6 +283,7 @@ void kernel_main(void) {
     vga_init();
     kb_init();
     process_init();
+    thread_init();
     print_splash();
     shell_run();
 
