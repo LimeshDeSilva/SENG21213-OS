@@ -28,6 +28,7 @@
 #include "thread.h"
 #include "mutex.h"
 #include "pmm.h"
+#include "fs.h"
 /* ---------------------------------------------------------------------------
  * Forward declarations of shell commands
  * --------------------------------------------------------------------------*/
@@ -266,6 +267,53 @@ static void cmd_dealloc(void) {
     }
 }
 
+static void cmd_ls(void) {
+    vga_puts("\n");
+    fs_list();
+}
+
+static void cmd_cat(const char *filename) {
+    static char file_buf[1024];
+    if (k_strlen(filename) == 0) {
+        vga_puts("\n  Usage: cat <filename>\n");
+        return;
+    }
+
+    int bytes = fs_read(filename, file_buf, sizeof(file_buf));
+    if (bytes >= 0) {
+        vga_puts("\n");
+        vga_puts(file_buf);
+    } else {
+        vga_printf("\n  [FS] File not found: %s\n", filename);
+    }
+}
+
+static void cmd_write(const char *arg) {
+    if (k_strlen(arg) == 0) {
+        vga_puts("\n  Usage: write <filename> <text>\n");
+        return;
+    }
+
+    char name[32];
+    int i = 0;
+    while (arg[i] && arg[i] != ' ' && i < 31) {
+        name[i] = arg[i];
+        i++;
+    }
+    name[i] = '\0';
+
+    while (arg[i] == ' ') i++;
+
+    const char *data = &arg[i];
+    uint32_t len = k_strlen(data);
+
+    if (fs_write(name, data, len) >= 0) {
+        vga_printf("\n  [FS] Successfully wrote %d bytes to %s\n", len, name);
+    } else {
+        vga_puts("\n  [FS] Write failed: disk full!\n");
+    }
+}
+
 static void shell_run(void) {
     vga_puts_color("\n  Kernel Shell ready. Type 'help' for commands.\n",
                    VGA_LIGHT_GREEN, VGA_BLACK);
@@ -291,6 +339,17 @@ static void shell_run(void) {
 	if (k_strcmp(cmd, "free")    == 0) { cmd_free();    continue; }
         if (k_strcmp(cmd, "alloc")   == 0) { cmd_alloc();   continue; }
         if (k_strcmp(cmd, "dealloc") == 0) { cmd_dealloc(); continue; }
+	if (k_strcmp(cmd, "ls") == 0) { cmd_ls(); continue; }
+
+        if (k_strncmp(cmd, "cat ", 4) == 0) {
+            cmd_cat(k_ltrim(cmd + 4));
+            continue;
+        }
+
+        if (k_strncmp(cmd, "write ", 6) == 0) {
+            cmd_write(k_ltrim(cmd + 6));
+            continue;
+        }
 
         if (k_strncmp(cmd, "echo ", 5) == 0) {
             cmd_echo(k_ltrim(cmd + 5));
@@ -298,9 +357,7 @@ static void shell_run(void) {
         }
 
         /* Milestone stubs */
-        if (k_strcmp(cmd, "kill")    == 0 ||
-            k_strcmp(cmd, "ls")      == 0 ||
-            k_strcmp(cmd, "cat")     == 0) {
+        if (k_strcmp(cmd, "kill") == 0) {    
             vga_puts_color("  [TODO] This command is not yet implemented.\n",
                            VGA_YELLOW, VGA_BLACK);
             vga_puts("  Implement it as part of your lecture assignment.\n");
@@ -320,6 +377,7 @@ void kernel_main(void) {
     vga_init();
     kb_init();
     pmm_init(32 * 1024 * 1024);
+    fs_init();
     process_init();
     thread_init();
     print_splash();
