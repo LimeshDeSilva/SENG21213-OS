@@ -30,7 +30,8 @@ KERNEL_C_SRCS   := kernel/kernel.c \
                    kernel/keyboard.c \
                    kernel/process.c \
                    kernel/thread.c \
-                   kernel/mutex.c
+                   kernel/mutex.c \
+                   kernel/pmm.c
 
 KERNEL_C_OBJS   := $(patsubst kernel/%.c, build/%.o, $(KERNEL_C_SRCS))
 KERNEL_ELF      := build/kernel.elf

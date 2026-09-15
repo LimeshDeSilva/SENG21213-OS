@@ -27,6 +27,7 @@
 #include "process.h"
 #include "thread.h"
 #include "mutex.h"
+#include "pmm.h"
 /* ---------------------------------------------------------------------------
  * Forward declarations of shell commands
  * --------------------------------------------------------------------------*/
@@ -231,6 +232,40 @@ static void cmd_mutex_test(void) {
     vga_puts("\n");
 }
 
+static void *test_allocated_page = 0;
+
+static void cmd_free(void) {
+    uint32_t free_pg = pmm_get_free_pages();
+    uint32_t used_pg = pmm_get_used_pages();
+    uint32_t free_kb = free_pg * 4;
+    uint32_t used_kb = used_pg * 4;
+
+    vga_puts("\n  --- Physical Memory Statistics ---\n");
+    vga_puts("  Page Size : 4 KB\n");
+    vga_puts("  Total RAM : 32 MB (8192 pages)\n");
+    vga_printf("  Used Pages: %d (%d KB)\n", used_pg, used_kb);
+    vga_printf("  Free Pages: %d (%d KB)\n", free_pg, free_kb);
+}
+
+static void cmd_alloc(void) {
+    test_allocated_page = pmm_alloc_page();
+    if (test_allocated_page) {
+        vga_printf("\n  [PMM] Allocated 4KB physical frame at: 0x%x\n", (uint32_t)test_allocated_page);
+    } else {
+        vga_puts("\n  [PMM] Allocation failed: out of physical memory!\n");
+    }
+}
+
+static void cmd_dealloc(void) {
+    if (test_allocated_page) {
+        pmm_free_page(test_allocated_page);
+        vga_printf("\n  [PMM] Freed page at: 0x%x\n", (uint32_t)test_allocated_page);
+        test_allocated_page = 0;
+    } else {
+        vga_puts("\n  [PMM] No page currently allocated to free.\n");
+    }
+}
+
 static void shell_run(void) {
     vga_puts_color("\n  Kernel Shell ready. Type 'help' for commands.\n",
                    VGA_LIGHT_GREEN, VGA_BLACK);
@@ -253,6 +288,9 @@ static void shell_run(void) {
         if (k_strcmp(cmd, "yield") == 0) { cmd_yield(); continue; }
 	if (k_strcmp(cmd, "threads") == 0) { cmd_threads();    continue; }
         if (k_strcmp(cmd, "mutex")   == 0) { cmd_mutex_test(); continue; }
+	if (k_strcmp(cmd, "free")    == 0) { cmd_free();    continue; }
+        if (k_strcmp(cmd, "alloc")   == 0) { cmd_alloc();   continue; }
+        if (k_strcmp(cmd, "dealloc") == 0) { cmd_dealloc(); continue; }
 
         if (k_strncmp(cmd, "echo ", 5) == 0) {
             cmd_echo(k_ltrim(cmd + 5));
@@ -261,7 +299,6 @@ static void shell_run(void) {
 
         /* Milestone stubs */
         if (k_strcmp(cmd, "kill")    == 0 ||
-            k_strcmp(cmd, "free")    == 0 ||
             k_strcmp(cmd, "ls")      == 0 ||
             k_strcmp(cmd, "cat")     == 0) {
             vga_puts_color("  [TODO] This command is not yet implemented.\n",
@@ -282,6 +319,7 @@ static void shell_run(void) {
 void kernel_main(void) {
     vga_init();
     kb_init();
+    pmm_init(32 * 1024 * 1024);
     process_init();
     thread_init();
     print_splash();
