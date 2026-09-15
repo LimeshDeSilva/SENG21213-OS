@@ -24,7 +24,7 @@
 #include "vga.h"
 #include "keyboard.h"
 #include "../include/types.h"
-
+#include "process.h"
 /* ---------------------------------------------------------------------------
  * Forward declarations of shell commands
  * --------------------------------------------------------------------------*/
@@ -33,6 +33,9 @@ static void cmd_clear(void);
 static void cmd_about(void);
 static void cmd_echo(const char *args);
 static void cmd_mem(void);
+static void cmd_ps(void);
+static void cmd_spawn(void);
+static void cmd_yield(void);
 
 /* ---------------------------------------------------------------------------
  * Utility: minimal string helpers (no libc in a freestanding kernel!)
@@ -165,6 +168,35 @@ static void cmd_mem(void) {
 static char  shell_buf[256];
 static char  prompt[] = "\n  ksh> ";
 
+static void worker_task(void) {
+    vga_puts("\n  [Worker Task] Started. Doing work step 1...\n");
+    process_yield();
+    vga_puts("\n  [Worker Task] Resumed. Doing work step 2...\n");
+    process_yield();
+    vga_puts("\n  [Worker Task] Work finished. Exiting.\n");
+}
+
+static void cmd_ps(void) {
+    vga_puts("\n");
+    process_list();
+}
+
+static void cmd_spawn(void) {
+    int pid = process_create("worker", worker_task);
+    if (pid >= 0) {
+        vga_puts("\n  [Spawned process 'worker' with PID ");
+        vga_putchar('0' + pid);
+        vga_puts("]\n");
+    } else {
+        vga_puts("\n  [Failed: process table full]\n");
+    }
+}
+
+static void cmd_yield(void) {
+    vga_puts("\n  [Yielding CPU to next READY task...]\n");
+    process_yield();
+}
+
 static void shell_run(void) {
     vga_puts_color("\n  Kernel Shell ready. Type 'help' for commands.\n",
                    VGA_LIGHT_GREEN, VGA_BLACK);
@@ -182,6 +214,9 @@ static void shell_run(void) {
         if (k_strcmp(cmd, "clear") == 0) { cmd_clear(); continue; }
         if (k_strcmp(cmd, "about") == 0) { cmd_about(); continue; }
         if (k_strcmp(cmd, "mem")   == 0) { cmd_mem();   continue; }
+	if (k_strcmp(cmd, "ps")    == 0) { cmd_ps();    continue; }
+        if (k_strcmp(cmd, "spawn") == 0) { cmd_spawn(); continue; }
+        if (k_strcmp(cmd, "yield") == 0) { cmd_yield(); continue; }
 
         if (k_strncmp(cmd, "echo ", 5) == 0) {
             cmd_echo(k_ltrim(cmd + 5));
@@ -189,8 +224,7 @@ static void shell_run(void) {
         }
 
         /* Milestone stubs */
-        if (k_strcmp(cmd, "ps")      == 0 ||
-            k_strcmp(cmd, "kill")    == 0 ||
+        if (k_strcmp(cmd, "kill")    == 0 ||
             k_strcmp(cmd, "threads") == 0 ||
             k_strcmp(cmd, "free")    == 0 ||
             k_strcmp(cmd, "ls")      == 0 ||
@@ -213,6 +247,7 @@ static void shell_run(void) {
 void kernel_main(void) {
     vga_init();
     kb_init();
+    process_init();
     print_splash();
     shell_run();
 
